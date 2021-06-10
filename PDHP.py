@@ -1,31 +1,11 @@
-from __future__ import print_function
-from __future__ import division
-
-import pickle
-import bz2
-from Plots import compute_kernel_alltimes
 import sys
 import os
-
 import numpy as np
+import time
+from copy import deepcopy as copy
 
 from utils import *
-import copyreg as copy_reg
-import types
-from copy import deepcopy as copy
-import time
-
 from Evaluation import compDists, confMat
-
-np.random.seed(1111)
-
-def _pickle_method(m):
-	if m.im_self is None:
-		return getattr, (m.im_class, m.im_func.func_name)
-	else:
-		return getattr, (m.im_self, m.im_func.func_name)
-
-copy_reg.pickle(types.MethodType, _pickle_method)
 
 class Dirichlet_Hawkes_Process(object):
 	"""docstring for Dirichlet Hawkes Prcess"""
@@ -105,8 +85,7 @@ class Dirichlet_Hawkes_Process(object):
 				# Language model likelihood
 				cls_word_distribution = particle.clusters[active_cluster_index].word_distribution + doc.word_distribution
 				cls_word_count = particle.clusters[active_cluster_index].word_count + doc.word_count
-				cls_log_dirichlet_multinomial_distribution = log_dirichlet_multinomial_distribution(cls_word_distribution, doc.word_distribution,\
-				 cls_word_count, doc.word_count, self.vocabulary_size, self.theta0)
+				cls_log_dirichlet_multinomial_distribution = log_dirichlet_multinomial_distribution(cls_word_distribution, doc.word_distribution, cls_word_count, doc.word_count, self.vocabulary_size, self.theta0)
 				active_cluster_textual_probs.append(cls_log_dirichlet_multinomial_distribution)
 
 			# Posteriors to probabilities
@@ -451,19 +430,10 @@ def getArgs(args):
 		rarr.append(float(rstr))
 	return dataFile, outputFolder, means, sigs, lamb0, rarr, nbRuns, theta0, alpha0, sample_num, particle_num, printRes
 
-with open("test/Reddit.txt", "w+") as fout:
-	with open("test/Reddit_events.txt", "r") as f:
-		for i, line in enumerate(f):
-			l = line.replace("\n", "").split("\t")
-			timestamp = float(l[2])
-			words = l[3].split(",")
-			fout.write(f"{l[2]}\t{l[3]}\n")
-#pause()
 if __name__ == '__main__':
 	dataFile, outputFolder, means, sigs, lamb0, arrR, nbRuns, theta0, alpha0, sample_num, particle_num, printRes = getArgs(sys.argv)
 
 	observations, V = readObservations(dataFile, outputFolder)
-
 
 	t = time.time()
 	i = 0
