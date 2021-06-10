@@ -1,8 +1,5 @@
 # PDHP
-Implementation of the Powered Dirichlet-Hawkes process.
-The script SCM_sampling.py is the one that has been used in the article.
-
-The script PDHP.py is a cleaner version, that can be ran from console.
+The script PDHP.py is an implementation of the Powered Dirichlet-Hawkes process, that can be ran from console.
 
 ## Usage
 Run the script PDHP.py using the following syntax: [keyword]=[value][space]
@@ -81,7 +78,7 @@ Cluster[tabulation]cluster index (int)[tabulation]alpha0 (float)[tabulation]infe
 
 
 ## Dependencies
-Numpy, Scipy
+Numpy, Scipy, re
 
 
 
