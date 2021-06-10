@@ -1,8 +1,4 @@
-from __future__ import division
-
-import matplotlib.pyplot as plt
 import numpy as np
-import scipy.stats
 from scipy.special import erfc, gammaln
 from scipy.stats import dirichlet as dirsp
 from copy import deepcopy as copy
@@ -100,15 +96,6 @@ def EfficientImplementation(tn, reference_time, bandwidth, epsilon = 1e-5):
 	tu = tn - ( max_ref_time + np.sqrt( -2 * max_bandwidth * np.log(0.5 * epsilon * np.sqrt(2 * np.pi * max_bandwidth**2)) ))
 	return tu
 
-def log_dirichlet_CDF(outcomes, prior):
-	''' the function only applies to the symmetry case when all prior equals to 1.
-		@param:
-			1.outcomes: output variables vector
-			2.prior: must be list of 1's in our case, avoiding the integrals.
-		@rtype: 
-	'''
-	return np.sum(np.log(outcomes)) + scipy.stats.dirichlet.logpdf(outcomes, prior)
-
 def log_dirichlet_PDF(alpha, alpha0):
 	return dirsp.logpdf(alpha, alpha0)
 
@@ -166,34 +153,6 @@ def g_theta(timeseq, reference_time, bandwidth, max_time):
 	#return np.sum(results, axis = 0)
 	return np.ones((len(results))).dot(results)
 
-def log_likelihood(timeseq, alphas, reference_time, bandwidth, base_intensity, max_time):
-	''' compute log_likelihood for a time sequence for a cluster for SMC
-		@param:
-			1. timeseq: list, time sequence including current time
-			2. alphas: 2-D np.array with shape (sample number, length of alpha)
-			3. reference_time: np.array
-			4. bandwidth: np.array
-			5. log_priors: 1-D np.array, p(alpha, alpha_0)
-			6. base_intensity: float
-			7. max_time: float
-		@rtype: 1-D numpy array with shape (sample number,)
-	'''
-
-	#################" WRONG DO NOT CONSIDER THIS LIKELIHOOD #######################
-	Lambda_0 = base_intensity * max_time
-	#alphas_times_gtheta = np.sum(alphas * g_theta(timeseq, reference_time, bandwidth, max_time), axis = 1) # shape = (sample number,)
-	alphas_times_gtheta = alphas.dot(g_theta(timeseq, reference_time, bandwidth, max_time))
-
-	time_intervals = np.subtract.outer(timeseq, timeseq)
-	time_intervals = time_intervals[time_intervals>0].flatten()
-
-	alphas = alphas.reshape(-1, 1, alphas.shape[-1])
-	triggers = np.log(triggering_kernel(alphas, reference_time, time_intervals, bandwidth)+1e-100)
-
-
-	L = -Lambda_0-alphas_times_gtheta+triggers
-	return L
-
 def update_cluster_likelihoods(timeseq, cluster, reference_time, bandwidth, base_intensity, max_time):
 	alphas = cluster.alphas
 	Lambda_0 = base_intensity * max_time
@@ -213,36 +172,6 @@ def update_cluster_likelihoods(timeseq, cluster, reference_time, bandwidth, base
 	cluster.likelihood_samples = -Lambda_0 - cluster.integ_triggers + cluster.likelihood_samples_sansLambda
 
 	return copy(cluster)
-
-def update_triggering_kernel(timeseq, alphas, reference_time, bandwidth, base_intensity, max_time, log_priors, r):
-	''' procedure of triggering kernel for SMC
-		@param:
-			1. timeseq: list, time sequence including current time
-			2. alphas: 2-D np.array with shape (sample number, length of alpha)
-			3. reference_time: np.array
-			4. bandwidth: np.array
-			5. log_priors: 1-D np.array with shape (sample number,), p(alpha, alpha_0)
-			6. base_intensity: float
-			7. max_time: float
-		@rtype: 1-D numpy array with shape (length of alpha0,)
-	'''
-
-	logLikelihood = log_likelihood(timeseq, alphas, reference_time, bandwidth, base_intensity, max_time)
-	log_update_weight = log_priors + logLikelihood
-	log_update_weight = log_update_weight - np.max(log_update_weight)
-	update_weight = np.exp(log_update_weight)
-
-	#update_weight[update_weight<np.mean(update_weight)]=0.
-
-	sumUpdateWeight = update_weight.dot(np.ones((len(update_weight))))
-	#sumUpdateWeight = np.sum(update_weight)
-	update_weight = update_weight / sumUpdateWeight
-
-	#update_weight = update_weight.reshape(-1,1)
-	#alpha = np.sum(update_weight * alphas, axis = 0)
-	alpha = update_weight.dot(alphas)
-
-	return alpha
 
 def update_triggering_kernel_optim(cluster):
 	''' procedure of triggering kernel for SMC
