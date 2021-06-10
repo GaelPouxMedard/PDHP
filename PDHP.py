@@ -3,9 +3,7 @@ import os
 import numpy as np
 import time
 from copy import deepcopy as copy
-
 from utils import *
-from Evaluation import compDists, confMat
 
 class Dirichlet_Hawkes_Process(object):
 	"""docstring for Dirichlet Hawkes Prcess"""
@@ -211,19 +209,86 @@ class Dirichlet_Hawkes_Process(object):
 			self.particles = None
 			return remaining_particles
 
+def getArgs(args):
+	import re
+	dataFile, kernelFile, outputFolder, r, nbRuns, theta0, alpha0, sample_num, particle_num, printRes = [None]*10
+	for a in args:
+		print(a)
+		try: dataFile = re.findall("(?<=data_file=)(.*)(?=)", a)[0]
+		except: pass
+		try: kernelFile = re.findall("(?<=kernel_file=)(.*)(?=)", a)[0]
+		except: pass
+		try: outputFolder = re.findall("(?<=output_folder=)(.*)(?=)", a)[0]
+		except: pass
+		try: r = re.findall("(?<=r=)(.*)(?=)", a)[0]
+		except: pass
+		try: nbRuns = int(re.findall("(?<=runs=)(.*)(?=)", a)[0])
+		except: pass
+		try: theta0 = float(re.findall("(?<=theta0=)(.*)(?=)", a)[0])
+		except: pass
+		try: alpha0 = float(re.findall("(?<=alpha0=)(.*)(?=)", a)[0])
+		except: pass
+		try: sample_num = int(re.findall("(?<=number_samples=)(.*)(?=)", a)[0])
+		except: pass
+		try: particle_num = int(re.findall("(?<=number_particles=)(.*)(?=)", a)[0])
+		except: pass
+		try: printRes = bool(re.findall("(?<=print_progress=)(.*)(?=)", a)[0])
+		except: pass
+
+	if dataFile is None:
+		sys.exit("Enter a valid value for data_file")
+	if kernelFile is None:
+		sys.exit("Enter a valid value for kernel_file")
+	if outputFolder is None:
+		sys.exit("Enter a valid value for output_folder")
+	if r is None: print("r value not found; defaulted to 1"); r="1"
+	if nbRuns is None: print("nbRuns value not found; defaulted to 1"); nbRuns=1
+	if theta0 is None: print("theta0 value not found; defaulted to 0.01"); theta0=0.01
+	if alpha0 is None: print("alpha0 value not found; defaulted to 0.5"); alpha0=0.5
+	if sample_num is None: print("sample_num value not found; defaulted to 2000"); sample_num=2000
+	if particle_num is None: print("particle_num value not found; defaulted to 8"); particle_num=8
+	if printRes is None: print("printRes value not found; defaulted to True"); printRes=True
+
+	with open(kernelFile, 'r') as f:
+		i=0
+		tabMeans, tabSigs = [], []
+		for line in f:
+			if line=="\n":
+				i += 1
+				continue
+			if i==0:
+				lamb0 = float(line.replace("\n", ""))
+			if i==1:
+				tabMeans.append(float(line.replace("\n", "")))
+			if i==2:
+				tabSigs.append(float(line.replace("\n", "")))
+
+	curdir = os.curdir+"/"
+	for folder in outputFolder.split("/"):
+		if folder not in os.listdir(curdir) and folder != "":
+			os.mkdir(curdir+folder+"/")
+		curdir += folder+"/"
+
+	if len(tabMeans)!=len(tabSigs):
+		sys.exit("The means and standard deviation do not match. Please check the parameters file.\n"
+				 "The values should be organized as follows:\n[lambda_0]\n\n[mean_1]\n[mean_2]\n...\n[mean_K]\n\n[sigma_1]\n[sigma_2]\n...\n[sigma_K]\n")
+	means = np.array(tabMeans)
+	sigs = np.array(tabSigs)
+
+	rarr = []
+	for rstr in r.split(","):
+		rarr.append(float(rstr))
+	return dataFile, outputFolder, means, sigs, lamb0, rarr, nbRuns, theta0, alpha0, sample_num, particle_num, printRes
+
 def parse_newsitem_2_doc(news_item, vocabulary_size):
-	''' convert (id, timestamp, word_distribution, word_count) to the form of document
-	'''
-	#print(news_item)
 	index = news_item[0]
-	timestamp = news_item[1] # / 3600.0 # unix time in hour
+	timestamp = news_item[1]
 	word_id = news_item [2][0]
 	count = news_item[2][1]
 	word_distribution = np.zeros(vocabulary_size)
 	word_distribution[word_id] = count
 	word_count = np.sum(count)
 	doc = Document(index, timestamp, word_distribution, word_count)
-	# assert doc.word_count == np.sum(doc.word_distribution)
 	return doc
 
 def readObservations(dataFile, outputFolder):
@@ -250,31 +315,31 @@ def readObservations(dataFile, outputFolder):
 	V = len(wdToIndex)
 	return observations, V
 
-def getLikTxt(cluster, theta0=None):
-	cls_word_distribution = np.array(cluster.word_distribution, dtype=int)
-	cls_word_count = int(cluster.word_count)
-
-	vocabulary_size = len(cls_word_distribution)
-	if theta0 is None:
-		theta0 = 0.01
-
-	priors_sum = theta0*vocabulary_size  # ATTENTION SEULEMENT SI THETA0 EST SYMMETRIQUE !!!!
-	log_prob = 0
-
-	cnt = np.bincount(cls_word_distribution)
-	un = np.arange(len(cnt))
-
-	log_prob += gammaln(priors_sum)
-	log_prob += gammaln(cls_word_count+1)
-	log_prob += gammaln(un + theta0).dot(cnt)  # ATTENTION SEULEMENT SI THETA0 EST SYMMETRIQUE !!!!
-
-	log_prob -= gammaln(cls_word_count + priors_sum)
-	log_prob -= vocabulary_size*gammaln(theta0)
-	log_prob -= gammaln(cls_word_count+1)
-
-	return log_prob
-
 def writeParticles(DHP, folderOut, nameOut):
+	def getLikTxt(cluster, theta0=None):
+		cls_word_distribution = np.array(cluster.word_distribution, dtype=int)
+		cls_word_count = int(cluster.word_count)
+
+		vocabulary_size = len(cls_word_distribution)
+		if theta0 is None:
+			theta0 = 0.01
+
+		priors_sum = theta0*vocabulary_size  # ATTENTION SEULEMENT SI THETA0 EST SYMMETRIQUE !!!!
+		log_prob = 0
+
+		cnt = np.bincount(cls_word_distribution)
+		un = np.arange(len(cnt))
+
+		log_prob += gammaln(priors_sum)
+		log_prob += gammaln(cls_word_count+1)
+		log_prob += gammaln(un + theta0).dot(cnt)  # ATTENTION SEULEMENT SI THETA0 EST SYMMETRIQUE !!!!
+
+		log_prob -= gammaln(cls_word_count + priors_sum)
+		log_prob -= vocabulary_size*gammaln(theta0)
+		log_prob -= gammaln(cls_word_count+1)
+
+		return log_prob
+
 	with open(folderOut+nameOut+"_particles.txt", "w+") as f:
 		for pIter, p in enumerate(DHP.particles):
 			f.write(f"Particle\t{pIter}\t{p.weight}\t{p.docs2cluster_ID}\n")
@@ -350,85 +415,14 @@ def run_fit(observations, folderOut, nameOut, lamb0, means, sigs, r=1., theta0=N
 					time.sleep(10)
 					continue
 
-
 	while True:
 		try:
 			writeParticles(DHP, folderOut, nameOut)
 		except Exception as e:
-			time.sleep(10)
 			print(e)
+			time.sleep(10)
 			continue
 
-def getArgs(args):
-	import re
-	dataFile, kernelFile, outputFolder, r, nbRuns, theta0, alpha0, sample_num, particle_num, printRes = [None]*10
-	for a in args:
-		print(a)
-		try: dataFile = re.findall("(?<=data_file=)(.*)(?=)", a)[0]
-		except: pass
-		try: kernelFile = re.findall("(?<=kernel_file=)(.*)(?=)", a)[0]
-		except: pass
-		try: outputFolder = re.findall("(?<=output_folder=)(.*)(?=)", a)[0]
-		except: pass
-		try: r = re.findall("(?<=r=)(.*)(?=)", a)[0]
-		except: pass
-		try: nbRuns = int(re.findall("(?<=runs=)(.*)(?=)", a)[0])
-		except: pass
-		try: theta0 = float(re.findall("(?<=theta0=)(.*)(?=)", a)[0])
-		except: pass
-		try: alpha0 = float(re.findall("(?<=alpha0=)(.*)(?=)", a)[0])
-		except: pass
-		try: sample_num = int(re.findall("(?<=number_samples=)(.*)(?=)", a)[0])
-		except: pass
-		try: particle_num = int(re.findall("(?<=number_particles=)(.*)(?=)", a)[0])
-		except: pass
-		try: printRes = bool(re.findall("(?<=print_progress=)(.*)(?=)", a)[0])
-		except: pass
-
-	if dataFile is None:
-		sys.exit("Enter a valid value for data_file")
-	if kernelFile is None:
-		sys.exit("Enter a valid value for kernel_file")
-	if outputFolder is None:
-		sys.exit("Enter a valid value for output_folder")
-	if r is None: print("r value not found; defaulted to 1"); r="1"
-	if nbRuns is None: print("nbRuns value not found; defaulted to 1"); nbRuns=1
-	if theta0 is None: print("theta0 value not found; defaulted to 0.01"); theta0=0.01
-	if alpha0 is None: print("alpha0 value not found; defaulted to 0.5"); alpha0=0.5
-	if sample_num is None: print("sample_num value not found; defaulted to 2000"); sample_num=2000
-	if particle_num is None: print("particle_num value not found; defaulted to 8"); particle_num=8
-	if printRes is None: print("printRes value not found; defaulted to True"); printRes=True
-
-	with open(kernelFile, 'r') as f:
-		i=0
-		tabMeans, tabSigs = [], []
-		for line in f:
-			if line=="\n":
-				i += 1
-				continue
-			if i==0:
-				lamb0 = float(line.replace("\n", ""))
-			if i==1:
-				tabMeans.append(float(line.replace("\n", "")))
-			if i==2:
-				tabSigs.append(float(line.replace("\n", "")))
-
-	curdir = os.curdir+"/"
-	for folder in outputFolder.split("/"):
-		if folder not in os.listdir(curdir) and folder != "":
-			os.mkdir(curdir+folder+"/")
-		curdir += folder+"/"
-
-	if len(tabMeans)!=len(tabSigs):
-		sys.exit("The means and standard deviation do not match. Please check the parameters file.\n"
-				 "The values should be organized as follows:\n[lambda_0]\n\n[mean_1]\n[mean_2]\n...\n[mean_K]\n\n[sigma_1]\n[sigma_2]\n...\n[sigma_K]\n")
-	means = np.array(tabMeans)
-	sigs = np.array(tabSigs)
-
-	rarr = []
-	for rstr in r.split(","):
-		rarr.append(float(rstr))
-	return dataFile, outputFolder, means, sigs, lamb0, rarr, nbRuns, theta0, alpha0, sample_num, particle_num, printRes
 
 if __name__ == '__main__':
 	dataFile, outputFolder, means, sigs, lamb0, arrR, nbRuns, theta0, alpha0, sample_num, particle_num, printRes = getArgs(sys.argv)
