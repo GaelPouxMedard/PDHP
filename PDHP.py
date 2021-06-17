@@ -418,6 +418,7 @@ def run_fit(observations, folderOut, nameOut, lamb0, means, sigs, r=1., theta0=N
 	while True:
 		try:
 			writeParticles(DHP, folderOut, nameOut)
+			break
 		except Exception as e:
 			print(e)
 			time.sleep(10)
