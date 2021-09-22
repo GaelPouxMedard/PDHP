@@ -1,5 +1,5 @@
 # PDHP
-The script PDHP.py is an implementation of the Powered Dirichlet-Hawkes process, that can be ran from console.
+The script PDHP.py is an implementation of the Powered Dirichlet-Hawkes process prior coupled to a simple Dirichlet-Multinomial language model, that can be ran from console.
 
 ## Usage
 Run the script PDHP.py using the following syntax: [keyword]=[value][space]
