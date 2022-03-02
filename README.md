@@ -1,5 +1,14 @@
 # PDHP
 The script PDHP.py is an implementation of the Powered Dirichlet-Hawkes process prior coupled to a simple Dirichlet-Multinomial language model, that can be ran from console.
+If you use it, please cite:
+  @article{Poux2021PDHP,
+  	title={Powered Hawkes-Dirichlet Process: Challenging Textual Clustering using a Flexible Temporal Prior},
+  	author={Ga\"el Poux-M\'edard and Julien Velcin and Sabine Loudcher},
+  	year={2021},
+  	booktitle={2021 IEEE International Conference on Data Mining (ICDM)},
+  	journal={ICDM},
+  	doi={10.1109/ICDM51629.2021.00062}
+  }
 
 ## Usage
 Run the script PDHP.py using the following syntax: [keyword]=[value][space]
